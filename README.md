@@ -1,7 +1,8 @@
 # ImapNotifier
 Watch an IMAP email account and show a taskbar system notification icon when there are new recent emails
 
-![Notification Icon Screenshot](Screenshots/NoficationArea.png)
+![Notification Icon Screenshot](Screenshots/NotificationArea.png)
+
 ![Configuration Screenshot](Screenshots/Configuration.png)
 
 # Usage
