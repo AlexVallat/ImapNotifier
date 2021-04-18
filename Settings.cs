@@ -9,7 +9,7 @@ using System.Windows.Forms;
 
 namespace ImapNotifier
 {
-    internal class Settings
+	internal class Settings
     {
         public string? Server { get; set; }
         public int? Port { get; set; }

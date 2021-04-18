@@ -1,14 +1,11 @@
+using SingleInstanceHelper;
 using System;
-using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using MailKit.Net.Imap;
-using Microsoft.Win32;
-using SingleInstanceHelper;
 
 namespace ImapNotifier
 {
-    static class Program
+	static class Program
     {
         /// <summary>
         ///  The main entry point for the application.
@@ -16,7 +13,7 @@ namespace ImapNotifier
         [STAThread]
         static async Task Main()
         {
-#if !DEBUG2
+#if !DEBUG
             try
 #endif
             {
@@ -34,7 +31,7 @@ namespace ImapNotifier
                 Application.Exit();
                 Application.DoEvents(); // Ensure the quit message is processed
             }
-#if !DEBUG2
+#if !DEBUG
             catch (Exception ex)
             {
                 TaskDialog.ShowDialog(new TaskDialogPage
