@@ -1,0 +1,44 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net5.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+	  <GenerateDependencyFile Condition="'$(Configuration)'!='DEBUG'">false</GenerateDependencyFile>
+	  <ApplicationIcon>Application.ico</ApplicationIcon>
+		<Nullable>Enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="SingleInstanceHelper\**" />
+    <EmbeddedResource Remove="SingleInstanceHelper\**" />
+    <None Remove="SingleInstanceHelper\**" />
+
+		<None Remove=".gitignore" />
+    <None Remove=".gitmodules" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Notification.ico" />
+    <EmbeddedResource Include="NotificationBlack.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MailKit" Version="2.11.1" />
+		<ProjectReference Include="SingleInstanceHelper\SingleInstanceHelper\SingleInstanceHelper.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ExcludeReference Include="Portable.Bouncycastle" />
+	</ItemGroup>
+
+	<Target Name="RemoveExcludedReferences" AfterTargets="ResolvePackageAssets">
+		<ItemGroup>
+			<ExcludeReference Update="@(ExcludeReference)" NuGetPackageId="%(Identity)" />
+			<PackageDependencies Remove="@(ExcludeReference)" />
+			<RuntimeCopyLocalItems Remove="@(RuntimeCopyLocalItems)" Condition="'%(NuGetPackageId)'!='' and '@(ExcludeReference)'!=''" />
+			<ResolvedCompileFileDefinitions Remove="@(ResolvedCompileFileDefinitions)" Condition="'%(NuGetPackageId)'=='@(ExcludeReference)'" />
+		</ItemGroup>
+	</Target>
+
+</Project>

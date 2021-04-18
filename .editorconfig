@@ -1,0 +1,7 @@
+﻿[*.cs]
+
+# RCS1096: Convert 'HasFlag' call to bitwise operation (or vice versa).
+dotnet_diagnostic.RCS1096.severity = none # not needed for .net core
+
+# RCS1090: Add call to 'ConfigureAwait' (or vice versa).
+dotnet_diagnostic.RCS1090.severity = silent # this is not a library

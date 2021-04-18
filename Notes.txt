@@ -1,0 +1,3 @@
+Light mode: Computer\HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize\SystemUsesLightTheme
+SVG renderer: https://github.com/svg-net/SVG (nuget Svg)
+Graceful quit by PostThreadMessage WM_QUIT

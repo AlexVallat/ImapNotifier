@@ -1,0 +1,1 @@
+dotnet publish ImapNotifier.csproj -c Release -f net5.0-windows -r win-x64 -p:PublishSingleFile=true --self-contained false
