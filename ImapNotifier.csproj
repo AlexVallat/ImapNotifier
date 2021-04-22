@@ -25,7 +25,7 @@
 
   <ItemGroup>
     <PackageReference Include="MailKit" Version="2.11.1" />
-		<ProjectReference Include="SingleInstanceHelper\SingleInstanceHelper\SingleInstanceHelper.csproj" />
+    <PackageReference Include="phirSOFT.SingleInstanceManager" Version="0.2.0" />
 	</ItemGroup>
 
 	<ItemGroup>

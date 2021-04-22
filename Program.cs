@@ -1,4 +1,3 @@
-using SingleInstanceHelper;
 using System;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -11,25 +10,30 @@ namespace ImapNotifier
         ///  The main entry point for the application.
         /// </summary>
         [STAThread]
-        static async Task Main()
+        static async Task Main(string[] args)
         {
 #if !DEBUG
             try
 #endif
             {
-                Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
-                Application.EnableVisualStyles();
-                Application.SetCompatibleTextRenderingDefault(false);
+                using var instanceManager = SingleInstanceManager.SingleInstanceManager.CreateManager();
+                if (instanceManager.RunApplication(args)) {
+                    Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
+                    Application.EnableVisualStyles();
+                    Application.SetCompatibleTextRenderingDefault(false);
 
-                var imapMonitor = new ImapMonitor();
+                    var imapMonitor = new ImapMonitor();
 
-                if (await ApplicationActivator.LaunchOrReturnAsync(_ => imapMonitor.ShowConfiguration(), Application.ProductName))
-                {
+                    instanceManager.SecondInstanceStarted += delegate
+                    {
+                        imapMonitor.ShowConfiguration();
+                    };
+
                     await imapMonitor.Run();
-                }
 
-                Application.Exit();
-                Application.DoEvents(); // Ensure the quit message is processed
+                    Application.Exit();
+                    Application.DoEvents(); // Ensure the quit message is processed
+                }
             }
 #if !DEBUG
             catch (Exception ex)
