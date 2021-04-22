@@ -10,7 +10,11 @@ namespace ImapNotifier
 {
 	class ImapMonitor
 	{
-		private readonly ImapClient _imapClient = new();
+		private readonly ImapClient _imapClient = new(
+#if DEBUG
+			new ProtocolLogger(new TraceLogStream())
+#endif
+			);
 
 		private NotifyIcon? _notifyIcon;
 
@@ -42,6 +46,9 @@ namespace ImapNotifier
 
 					var inbox = _imapClient.Inbox;
 					inbox.RecentChanged += OnInboxRecentChanged;
+					inbox.MessageExpunged += OnMessageExpunged;
+					// Show initial icon, if required
+					OnInboxRecentChanged(inbox, EventArgs.Empty);
 
 					while(true)
 					{
@@ -102,6 +109,14 @@ namespace ImapNotifier
 			{
 				_notifyIcon?.Dispose();
 				_notifyIcon = null;
+			}
+		}
+		private void OnMessageExpunged(object? sender, MessageEventArgs e)
+		{
+			if (_notifyIcon != null)
+			{
+				// If we are displaying an icon, schedule a reconnect so that the recent count gets updated
+				_idleDone?.Cancel();
 			}
 		}
 

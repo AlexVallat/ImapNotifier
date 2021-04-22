@@ -23,7 +23,7 @@ namespace ImapNotifier
 
                 var imapMonitor = new ImapMonitor();
 
-                if (await ApplicationActivator.LaunchOrReturnAsync(_ => imapMonitor.ShowConfiguration()))
+                if (await ApplicationActivator.LaunchOrReturnAsync(_ => imapMonitor.ShowConfiguration(), Application.ProductName))
                 {
                     await imapMonitor.Run();
                 }
