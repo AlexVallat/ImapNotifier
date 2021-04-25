@@ -21,6 +21,7 @@ namespace ImapNotifier
 		private CancellationTokenSource? _cancellation;
 		private CancellationTokenSource? _idleDone;
 		private bool _showConfiguration;
+		private bool _recalculateRecents;
 
 		public async Task Run()
 		{
@@ -66,6 +67,12 @@ namespace ImapNotifier
 						{
 							_idleDone.Dispose();
 							_idleDone = null;
+						}
+
+						if (_recalculateRecents)
+						{
+							_recalculateRecents = false;
+							await inbox.StatusAsync(StatusItems.Recent);
 						}
 					}
 				}
@@ -116,6 +123,7 @@ namespace ImapNotifier
 			if (_notifyIcon != null)
 			{
 				// If we are displaying an icon, schedule a reconnect so that the recent count gets updated
+				_recalculateRecents = true;
 				_idleDone?.Cancel();
 			}
 		}
