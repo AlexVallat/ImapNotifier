@@ -29,7 +29,7 @@ namespace ImapNotifier
                 {
                     if (value)
                     {
-                        key.SetValue(Application.ProductName, "\"" + Application.ExecutablePath);
+                        key.SetValue(Application.ProductName, "\"" + Application.ExecutablePath + "\"");
                     }
                     else
                     {
