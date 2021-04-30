@@ -49,7 +49,10 @@ namespace ImapNotifier
 
 		public void SetCount(int count)
 		{
-			_notifyIcon.Text = $"{count} messages";
+			if (count > 0)
+			{
+				_notifyIcon.Text = $"{count} messages";
+			}
 		}
 
 		private void Start()

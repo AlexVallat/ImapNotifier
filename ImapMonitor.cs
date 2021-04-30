@@ -37,6 +37,8 @@ namespace ImapNotifier
 				}
 			}
 
+			var firstRunIcon = new NotifyIcon(0);
+
 			while (true)
 			{
 				_cancellation = new CancellationTokenSource();
@@ -44,6 +46,12 @@ namespace ImapNotifier
 				try
 				{
 					await ReconnectAsync(_cancellation.Token);
+
+					if (firstRunIcon != null)
+					{
+						firstRunIcon.Dispose();
+						firstRunIcon = null;
+					}
 
 					var inbox = _imapClient.Inbox;
 					inbox.RecentChanged += OnInboxRecentChanged;
