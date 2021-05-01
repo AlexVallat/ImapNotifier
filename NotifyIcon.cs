@@ -30,7 +30,10 @@ namespace ImapNotifier
 		private NotifyIcon()
 		{
 			var isLightTheme = (Registry.GetValue(@"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize", "SystemUsesLightTheme", 0) as int?) == 1;
-			_icon = new Icon(typeof(NotifyIcon).Assembly.GetManifestResourceStream(typeof(NotifyIcon), isLightTheme ? "NotificationBlack.ico" : "Notification.ico")!, SystemInformation.SmallIconSize);
+			using (var iconStream = typeof(NotifyIcon).Assembly.GetManifestResourceStream(typeof(NotifyIcon), isLightTheme ? "NotificationBlack.ico" : "Notification.ico")!)
+			{
+				_icon = new Icon(iconStream, SystemInformation.SmallIconSize);
+			}
 			_notifyIcon = new System.Windows.Forms.NotifyIcon
 			{
 				Icon = _icon,
