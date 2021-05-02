@@ -7,27 +7,15 @@ using System.Windows.Forms;
 
 namespace ImapNotifier
 {
-	class NotifyIcon: IDisposable
+	class NotifyIcon: ApplicationContext
 	{
-		private readonly ApplicationContext _applicationContext = new();
-		private readonly Thread _thread;
-
 		private readonly System.Windows.Forms.NotifyIcon _notifyIcon;
 		private readonly Icon _icon;
-		private readonly string? _errorMessage;
+		private readonly WindowsFormsSynchronizationContext _synchronizationContext;
 
-		private bool _disposed;
+		private string? _errorMessage;
 
-		public NotifyIcon(int count) : this()
-		{
-			SetCount(count);
-		}
-		private NotifyIcon(string? errorMessage) : this()
-		{
-			_errorMessage = errorMessage;
-		}
-
-		private NotifyIcon()
+		public NotifyIcon()
 		{
 			var isLightTheme = (Registry.GetValue(@"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize", "SystemUsesLightTheme", 0) as int?) == 1;
 			using (var iconStream = typeof(NotifyIcon).Assembly.GetManifestResourceStream(typeof(NotifyIcon), isLightTheme ? "NotificationBlack.ico" : "Notification.ico")!)
@@ -38,74 +26,98 @@ namespace ImapNotifier
 			{
 				Icon = _icon,
 				Text = Application.ProductName,
+				Visible = true
 			};
 			_notifyIcon.MouseClick += OnClick;
 			_notifyIcon.BalloonTipClicked += OnBallonTipClicked;
 
-			_thread = new Thread(Start)
-			{
-				Name = "NotifyIcon Message Loop",
-			};
-			_thread.SetApartmentState(ApartmentState.STA);
-			_thread.Start();
-		}
+			ThreadExit += OnThreadExit;
 
-		public void SetCount(int count)
-		{
-			if (count > 0)
+			_synchronizationContext = SynchronizationContext.Current as WindowsFormsSynchronizationContext ?? CreateSyncContext();
+			WindowsFormsSynchronizationContext CreateSyncContext()
 			{
-				_notifyIcon.Text = $"{count} messages";
+				var syncContext = new WindowsFormsSynchronizationContext();
+				SynchronizationContext.SetSynchronizationContext(_synchronizationContext);
+				return syncContext;
 			}
 		}
 
-		private void Start()
+		private void OnThreadExit(object? sender, EventArgs e)
 		{
-			if (!_disposed)
+			_notifyIcon.Visible = false;
+		}
+
+		protected override void Dispose(bool disposing)
+		{
+			if (disposing)
 			{
-				try
-				{
-					_notifyIcon.Visible = true;
-					if (_errorMessage != null)
-					{
-						ShowErrorBallonTip();
-					}
-					Application.Run(_applicationContext);
-				}
-				finally
-				{
-					_notifyIcon.Dispose();
-					_icon.Dispose();
-				}
+				_notifyIcon.Dispose();
+				_icon.Dispose();
+			}
+			base.Dispose(disposing);
+		}
+
+		private int _count;
+		public int Count
+		{
+			get => _count;
+			set
+			{
+				_count = value;
+				Invoke(UpdateVisibility);
 			}
 		}
 
-		private void ShowErrorBallonTip()
+		public void Invoke(Action action)
 		{
-			_notifyIcon.ShowBalloonTip(0, "Error:", _errorMessage, ToolTipIcon.Error);
+			_synchronizationContext.Post(_ =>
+				action()
+			, null);
 		}
+
+		public T? Invoke<T>(Func<T> func)
+		{
+			T? result = default;
+			_synchronizationContext.Send(_ =>
+				result = func()
+			, null);
+
+			return result;
+		}
+
+		public void ShowIcon()
+		{
+			Invoke(() => { _notifyIcon.Visible = true; });
+		}
+
+		private void UpdateVisibility()
+		{
+			_notifyIcon.Text = _count > 0 ? $"{_count} messages" : Application.ProductName;
+			_notifyIcon.Visible = _count > 0;
+		}
+
+		public void ShowError(string message)
+		{
+			_errorMessage = message;
+			Invoke(delegate
+			{
+				_notifyIcon.Text = Application.ProductName + " Error";
+				_notifyIcon.Visible = true;
+				_notifyIcon.ShowBalloonTip(0, "Error:", message, ToolTipIcon.Error);
+			});
+		}
+
 		private void OnBallonTipClicked(object? sender, EventArgs e)
 		{
-			Dispose();
-		}
-
-		private static NotifyIcon? _errorIcon;
-		private static readonly object _errorIconLock = new();
-		public static void ShowError(string message)
-		{
-			// Only have one error showing at a time
-			lock (_errorIconLock)
-			{
-				_errorIcon?.Dispose();
-				_errorIcon = new NotifyIcon(message);
-				// Error notify icons are self-disposing
-			}
+			_errorMessage = null;
+			Invoke(UpdateVisibility);
 		}
 
 		private void OnClick(object? sender, MouseEventArgs e)
 		{
 			if (_errorMessage != null)
 			{
-				ShowErrorBallonTip();
+				ShowError(_errorMessage);
 			}
 			else if (!string.IsNullOrEmpty(Settings.Instance.OpenEmail))
 			{
@@ -121,17 +133,6 @@ namespace ImapNotifier
 				{
 					ShowError(Settings.Instance.OpenEmail + "\n\n" + ex.Message);
 				}
-			}
-		}
-
-		public void Dispose()
-		{
-			if (!_disposed)
-			{
-				_disposed = true;
-
-				_applicationContext.ExitThread();
-				_applicationContext.Dispose();
 			}
 		}
 	}

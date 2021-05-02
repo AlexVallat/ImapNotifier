@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -10,7 +11,7 @@ namespace ImapNotifier
         ///  The main entry point for the application.
         /// </summary>
         [STAThread]
-        static async Task Main(string[] args)
+        static void Main(string[] args)
         {
 #if !DEBUG
             try
@@ -22,17 +23,18 @@ namespace ImapNotifier
                     Application.EnableVisualStyles();
                     Application.SetCompatibleTextRenderingDefault(false);
 
-                    var imapMonitor = new ImapMonitor();
+                    using var notifyIcon = new NotifyIcon();
+
+                    var imapMonitor = new ImapMonitor(notifyIcon);
 
                     instanceManager.SecondInstanceStarted += delegate
                     {
                         imapMonitor.ShowConfiguration();
                     };
 
-                    await imapMonitor.Run();
+                    Task.Run(imapMonitor.Run);
 
-                    Application.Exit();
-                    Application.DoEvents(); // Ensure the quit message is processed
+                    Application.Run(notifyIcon);
                 }
             }
 #if !DEBUG

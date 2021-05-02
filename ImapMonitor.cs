@@ -16,12 +16,17 @@ namespace ImapNotifier
 #endif
 			);
 
-		private NotifyIcon? _notifyIcon;
+		private readonly NotifyIcon _notifyIcon;
 
 		private CancellationTokenSource? _cancellation;
 		private CancellationTokenSource? _idleDone;
 		private bool _showConfiguration;
 		private bool _recalculateRecents;
+
+		public ImapMonitor(NotifyIcon notifyIcon)
+		{
+			_notifyIcon = notifyIcon;
+		}
 
 		public async Task Run()
 		{
@@ -31,13 +36,12 @@ namespace ImapNotifier
 					Settings.Instance.Port == null ||
 					Settings.Instance.UseSsl == null)
 			{
-				if (ShowConfigurationDialog() != DialogResult.OK)
+				if (_notifyIcon.Invoke(ShowConfigurationDialog) != DialogResult.OK)
 				{
+					Application.Exit();
 					return;
 				}
 			}
-
-			var firstRunIcon = new NotifyIcon(0);
 
 			while (true)
 			{
@@ -47,16 +51,10 @@ namespace ImapNotifier
 				{
 					await ReconnectAsync(_cancellation.Token);
 
-					if (firstRunIcon != null)
-					{
-						firstRunIcon.Dispose();
-						firstRunIcon = null;
-					}
-
 					var inbox = _imapClient.Inbox;
 					inbox.RecentChanged += OnInboxRecentChanged;
 					inbox.MessageExpunged += OnMessageExpunged;
-					// Show initial icon, if required
+					// Set initial count on icon
 					OnInboxRecentChanged(inbox, EventArgs.Empty);
 
 					while(true)
@@ -91,9 +89,9 @@ namespace ImapNotifier
 					_cancellation = null;
 					if (_showConfiguration)
 					{
-						if (ShowConfigurationDialog() == DialogResult.Abort)
+						if (_notifyIcon.Invoke(ShowConfigurationDialog) == DialogResult.Abort)
 						{
-							// Exit
+							Application.Exit();
 							return;
 						}
 						// Otherwise, just re-connect without reloading config
@@ -101,34 +99,18 @@ namespace ImapNotifier
 				}
 				catch (Exception ex)
 				{
-					NotifyIcon.ShowError(ex.Message);
+					_notifyIcon.ShowError(ex.Message);
 				}
 			}
 		}
 
 		private void OnInboxRecentChanged(object? sender, EventArgs e)
 		{
-			var recent = (sender as IMailFolder)?.Recent;
-			if (recent > 0)
-			{
-				if (_notifyIcon == null)
-				{
-					_notifyIcon = new(recent.Value);
-				}
-				else
-				{
-					_notifyIcon.SetCount(recent.Value);
-				}
-			}
-			else
-			{
-				_notifyIcon?.Dispose();
-				_notifyIcon = null;
-			}
+			_notifyIcon.Count = ((sender as IMailFolder)?.Recent) ?? 0;
 		}
 		private void OnMessageExpunged(object? sender, MessageEventArgs e)
 		{
-			if (_notifyIcon != null)
+			if (_notifyIcon.Count > 0)
 			{
 				// If we are displaying an icon, schedule a reconnect so that the recent count gets updated
 				_recalculateRecents = true;
@@ -151,7 +133,7 @@ namespace ImapNotifier
 			}
 		}
 
-		private static DialogResult ShowConfigurationDialog()
+		private DialogResult ShowConfigurationDialog()
 		{
 			using var configuration = new Configuration();
 			return configuration.ShowDialog();
@@ -161,6 +143,7 @@ namespace ImapNotifier
 		{
 			if (_cancellation != null)
 			{
+				_notifyIcon.ShowIcon();
 				_showConfiguration = true;
 				_idleDone?.Cancel();
 				_cancellation?.Cancel();
