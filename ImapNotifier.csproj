@@ -10,17 +10,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="SingleInstanceHelper\**" />
-    <EmbeddedResource Remove="SingleInstanceHelper\**" />
-    <None Remove="SingleInstanceHelper\**" />
-
 		<None Remove=".gitignore" />
     <None Remove=".gitmodules" />
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="Notification.ico" />
-    <EmbeddedResource Include="NotificationBlack.ico" />
+    <EmbeddedResource Include="NotificationIcon\*.png" />
   </ItemGroup>
 
   <ItemGroup>

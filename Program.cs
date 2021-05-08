@@ -24,6 +24,7 @@ namespace ImapNotifier
                     Application.SetCompatibleTextRenderingDefault(false);
 
                     using var notifyIcon = new NotifyIcon();
+                    notifyIcon.ShowIcon();
 
                     var imapMonitor = new ImapMonitor(notifyIcon);
 
