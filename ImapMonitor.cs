@@ -1,5 +1,6 @@
 ﻿using MailKit;
 using MailKit.Net.Imap;
+using Microsoft.Win32;
 using System;
 using System.IO;
 using System.Threading;
@@ -20,12 +21,32 @@ namespace ImapNotifier
 
 		private CancellationTokenSource? _cancellation;
 		private CancellationTokenSource? _idleDone;
+		private TaskCompletionSource? _resume;
 		private bool _showConfiguration;
 		private bool _recalculateRecents;
 
 		public ImapMonitor(NotifyIcon notifyIcon)
 		{
 			_notifyIcon = notifyIcon;
+			SystemEvents.SessionEnding += delegate { Application.Exit(); };
+			SystemEvents.PowerModeChanged += OnPowerModeChanged;
+		}
+
+		private void OnPowerModeChanged(object sender, PowerModeChangedEventArgs e)
+		{
+			switch (e.Mode)
+			{
+				case PowerModes.Suspend:
+					if (_cancellation != null)
+					{
+						_resume = new TaskCompletionSource();
+						_cancellation.Cancel();
+					}
+					break;
+				case PowerModes.Resume:
+					_resume?.SetResult();
+					break;
+			}
 		}
 
 		public async Task Run()
@@ -87,6 +108,13 @@ namespace ImapNotifier
 					await _imapClient.DisconnectAsync(true);
 					_cancellation.Dispose();
 					_cancellation = null;
+
+					if (_resume != null)
+					{
+						await _resume.Task;
+						_resume = null;
+					}
+
 					if (_showConfiguration)
 					{
 						if (_notifyIcon.Invoke(ShowConfigurationDialog) == DialogResult.Abort)
