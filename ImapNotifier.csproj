@@ -7,6 +7,7 @@
 	  <GenerateDependencyFile Condition="'$(Configuration)'!='DEBUG'">false</GenerateDependencyFile>
 	  <ApplicationIcon>Application.ico</ApplicationIcon>
 		<Nullable>Enable</Nullable>
+		<Version>1.1.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
