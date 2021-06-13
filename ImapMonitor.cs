@@ -23,7 +23,7 @@ namespace ImapNotifier
 		private CancellationTokenSource? _idleDone;
 		private TaskCompletionSource? _resume;
 		private bool _showConfiguration;
-		private bool _recalculateRecents;
+		private bool _recalculateCount;
 
 		public ImapMonitor(NotifyIcon notifyIcon)
 		{
@@ -73,10 +73,18 @@ namespace ImapNotifier
 					await ReconnectAsync(_cancellation.Token);
 
 					var inbox = _imapClient.Inbox;
-					inbox.RecentChanged += OnInboxRecentChanged;
+					switch (Settings.Instance.CountType)
+					{
+						case CountType.Recent:
+							inbox.RecentChanged += OnInboxCountChanged;
+							break;
+						case CountType.Exists:
+							inbox.CountChanged += OnInboxCountChanged;
+							break;
+					}
 					inbox.MessageExpunged += OnMessageExpunged;
 					// Set initial count on icon
-					OnInboxRecentChanged(inbox, EventArgs.Empty);
+					OnInboxCountChanged(inbox, EventArgs.Empty);
 
 					while(true)
 					{
@@ -96,10 +104,16 @@ namespace ImapNotifier
 							_idleDone = null;
 						}
 
-						if (_recalculateRecents)
+						if (_recalculateCount)
 						{
-							_recalculateRecents = false;
-							await inbox.StatusAsync(StatusItems.Recent);
+							_recalculateCount = false;
+							await inbox.StatusAsync(
+								Settings.Instance.CountType switch
+								{
+									CountType.Recent => StatusItems.Recent,
+									CountType.Exists => StatusItems.Count,
+									_ => StatusItems.None
+								});
 						}
 					}
 				}
@@ -113,6 +127,10 @@ namespace ImapNotifier
 					{
 						await _resume.Task;
 						_resume = null;
+						while(!System.Net.NetworkInformation.NetworkInterface.GetIsNetworkAvailable())
+						{
+							await Task.Delay(TimeSpan.FromSeconds(1));
+						}
 					}
 
 					if (_showConfiguration)
@@ -132,16 +150,28 @@ namespace ImapNotifier
 			}
 		}
 
-		private void OnInboxRecentChanged(object? sender, EventArgs e)
+		private void OnInboxCountChanged(object? sender, EventArgs e)
 		{
-			_notifyIcon.Count = ((sender as IMailFolder)?.Recent) ?? 0;
+			if (sender is IMailFolder inbox)
+			{
+				_notifyIcon.Count = Settings.Instance.CountType switch
+				{
+					CountType.Recent => inbox.Recent,
+					CountType.Exists => inbox.Count,
+					_ => 0
+				};
+			}
+			else
+			{
+				_notifyIcon.Count = 0;
+			}
 		}
 		private void OnMessageExpunged(object? sender, MessageEventArgs e)
 		{
 			if (_notifyIcon.Count > 0)
 			{
 				// If we are displaying an icon, schedule a reconnect so that the recent count gets updated
-				_recalculateRecents = true;
+				_recalculateCount = true;
 				_idleDone?.Cancel();
 			}
 		}

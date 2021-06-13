@@ -18,6 +18,7 @@ namespace ImapNotifier
         [JsonConverter(typeof(Encrypted))]
         public string? Password { get; set; }
         public string? OpenEmail { get; set; }
+        public CountType CountType { get; set; }
 
 		[System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1822:Mark members as static", Justification = "Consistency")]
 		public bool StartWithWindows
@@ -48,13 +49,19 @@ namespace ImapNotifier
 		private static readonly string Path = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), Application.ProductName, "settings.json");
         private static readonly Lazy<Settings> _instance = new(Load);
 
-        public static Settings Instance => _instance.Value;
+        private static readonly JsonSerializerOptions SerializerOptions = new()
+        {
+            WriteIndented = true,
+            Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
+        };
+
+    public static Settings Instance => _instance.Value;
 
 		private static Settings Load()
         {
             if (File.Exists(Path))
             {
-                return JsonSerializer.Deserialize<Settings>(File.ReadAllText(Path)) ?? new Settings();
+                return JsonSerializer.Deserialize<Settings>(File.ReadAllText(Path), SerializerOptions) ?? new Settings();
             }
 
             return new Settings();
@@ -63,10 +70,7 @@ namespace ImapNotifier
         public void Save()
         {
             Directory.CreateDirectory(System.IO.Path.GetDirectoryName(Path)!);
-            File.WriteAllText(Path, JsonSerializer.Serialize(this, new JsonSerializerOptions
-            {
-                WriteIndented = true
-            }));
+			File.WriteAllText(Path, JsonSerializer.Serialize(this, SerializerOptions));
         }
 
         private class Encrypted : JsonConverter<string>
@@ -91,4 +95,10 @@ namespace ImapNotifier
 
         #endregion
     }
+
+    internal enum CountType
+	{
+        Recent,
+        Exists
+	}
 }
