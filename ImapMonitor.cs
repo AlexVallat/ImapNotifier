@@ -17,33 +17,58 @@ namespace ImapNotifier
 #endif
 			);
 
-		private readonly NotifyIcon _notifyIcon;
+		private static readonly TimeSpan[] _backOffRetry = new[] {
+			TimeSpan.FromSeconds(1),
+			TimeSpan.FromSeconds(5),
+			TimeSpan.FromSeconds(30),
+			TimeSpan.FromMinutes(1),
+			TimeSpan.FromMinutes(10),
+			TimeSpan.FromMinutes(30),
+			TimeSpan.FromHours(4),
+			TimeSpan.FromDays(1),
+		};
 
-		private CancellationTokenSource? _cancellation;
+		private readonly NotifyIcon _notifyIcon;
+        private readonly StreamWriter _logWriter;
+        private CancellationTokenSource? _cancellation;
 		private CancellationTokenSource? _idleDone;
+		private CancellationTokenSource? _interruptExceptionBackOff;
 		private TaskCompletionSource? _resume;
 		private bool _showConfiguration;
 		private bool _recalculateCount;
 
-		public ImapMonitor(NotifyIcon notifyIcon)
+		public ImapMonitor(NotifyIcon notifyIcon, StreamWriter logWriter)
 		{
 			_notifyIcon = notifyIcon;
+            _logWriter = logWriter;
+            _notifyIcon.ErrorDismissed += (_, _) => _interruptExceptionBackOff?.Cancel();
 			SystemEvents.SessionEnding += delegate { Application.Exit(); };
 			SystemEvents.PowerModeChanged += OnPowerModeChanged;
 		}
+
+		[System.Diagnostics.Conditional("LOG")]
+		private void Log(string message)
+        {
+			_logWriter.WriteLine($"{DateTime.Now:s}: {message}");
+			_logWriter.Flush();
+        }
 
 		private void OnPowerModeChanged(object sender, PowerModeChangedEventArgs e)
 		{
 			switch (e.Mode)
 			{
 				case PowerModes.Suspend:
+					Log("Suspending");
 					if (_cancellation != null)
 					{
 						_resume = new TaskCompletionSource();
+
+						Log("Cancelling due to suspension");
 						_cancellation.Cancel();
 					}
 					break;
 				case PowerModes.Resume:
+					Log($"Resuming: {(_resume == null ? "no signal" : "signalling")}");
 					_resume?.SetResult();
 					break;
 			}
@@ -64,6 +89,9 @@ namespace ImapNotifier
 				}
 			}
 
+			var backOffRetryIndex = 0;
+			IMailFolder? inbox = null;
+
 			while (true)
 			{
 				_cancellation = new CancellationTokenSource();
@@ -72,17 +100,29 @@ namespace ImapNotifier
 				{
 					await ReconnectAsync(_cancellation.Token);
 
-					var inbox = _imapClient.Inbox;
-					switch (Settings.Instance.CountType)
+					if (!ReferenceEquals(inbox, _imapClient.Inbox))
 					{
-						case CountType.Recent:
-							inbox.RecentChanged += OnInboxCountChanged;
-							break;
-						case CountType.Exists:
-							inbox.CountChanged += OnInboxCountChanged;
-							break;
+						Log("Connecting Inbox Event Handlers");
+						if (inbox != null)
+						{
+							inbox.RecentChanged -= OnInboxCountChanged;
+							inbox.CountChanged -= OnInboxCountChanged;
+							inbox.MessageExpunged -= OnMessageExpunged;
+						}
+
+						inbox = _imapClient.Inbox;
+						switch (Settings.Instance.CountType)
+						{
+							case CountType.Recent:
+								inbox.RecentChanged += OnInboxCountChanged;
+								break;
+							case CountType.Exists:
+								inbox.CountChanged += OnInboxCountChanged;
+								break;
+						}
+						inbox.MessageExpunged += OnMessageExpunged;
 					}
-					inbox.MessageExpunged += OnMessageExpunged;
+
 					// Set initial count on icon
 					OnInboxCountChanged(inbox, EventArgs.Empty);
 
@@ -92,10 +132,12 @@ namespace ImapNotifier
 						_idleDone = new CancellationTokenSource(TimeSpan.FromMinutes(9));
 						try
 						{
+							Log("Idling");
 							await _imapClient.IdleAsync(_idleDone.Token, _cancellation.Token);
 						}
 						catch(Exception ex) when (ex is ImapProtocolException || ex is IOException)
 						{
+							Log($"Reconnecting after exception on Idle: {ex.Message}");
 							await ReconnectAsync(_cancellation.Token);
 						}
 						finally
@@ -104,8 +146,12 @@ namespace ImapNotifier
 							_idleDone = null;
 						}
 
+						// Reset retry timings
+						backOffRetryIndex = 0;
+
 						if (_recalculateCount)
 						{
+							Log("Forced recalculation");
 							_recalculateCount = false;
 							await inbox.StatusAsync(
 								Settings.Instance.CountType switch
@@ -119,15 +165,22 @@ namespace ImapNotifier
 				}
 				catch (OperationCanceledException)
 				{
+					Log("Connection cancelled, disconnecting");
+
 					await _imapClient.DisconnectAsync(true);
 					_cancellation.Dispose();
 					_cancellation = null;
 
 					if (_resume != null)
 					{
+						Log("Awaiting resume");
+
 						await _resume.Task;
 						_resume = null;
-						while(!System.Net.NetworkInformation.NetworkInterface.GetIsNetworkAvailable())
+
+						Log("Waiting for network");
+
+						while (!System.Net.NetworkInformation.NetworkInterface.GetIsNetworkAvailable())
 						{
 							await Task.Delay(TimeSpan.FromSeconds(1));
 						}
@@ -135,8 +188,12 @@ namespace ImapNotifier
 
 					if (_showConfiguration)
 					{
+						Log("Showing Config UI");
+
 						if (_notifyIcon.Invoke(ShowConfigurationDialog) == DialogResult.Abort)
 						{
+							Log("Exiting");
+
 							Application.Exit();
 							return;
 						}
@@ -146,6 +203,17 @@ namespace ImapNotifier
 				catch (Exception ex)
 				{
 					_notifyIcon.ShowError(ex.Message);
+					var delay = _backOffRetry[Math.Max(backOffRetryIndex++, _backOffRetry.Length - 1)];
+					_interruptExceptionBackOff = new CancellationTokenSource();
+
+					Log($"Error: {ex.Message}, waiting {delay}");
+
+					await Task.Delay(delay, _interruptExceptionBackOff.Token);
+
+					Log("Retrying after error");
+
+					_interruptExceptionBackOff.Dispose();
+					_interruptExceptionBackOff = null;
 				}
 			}
 		}
@@ -154,6 +222,7 @@ namespace ImapNotifier
 		{
 			if (sender is IMailFolder inbox)
 			{
+				Log($"Inbox count changed: {inbox.Recent}/{inbox.Count}");
 				_notifyIcon.Count = Settings.Instance.CountType switch
 				{
 					CountType.Recent => inbox.Recent,
@@ -168,6 +237,7 @@ namespace ImapNotifier
 		}
 		private void OnMessageExpunged(object? sender, MessageEventArgs e)
 		{
+			Log("Message Expunged");
 			if (_notifyIcon.Count > 0)
 			{
 				// If we are displaying an icon, schedule a reconnect so that the recent count gets updated
@@ -180,15 +250,19 @@ namespace ImapNotifier
 		{
 			if (!_imapClient.IsConnected)
 			{
+				Log("Connecting...");
 				await _imapClient.ConnectAsync(Settings.Instance.Server, Settings.Instance.Port ?? 143, Settings.Instance.UseSsl ?? false, cancellation);
 			}
 
 			if (!_imapClient.IsAuthenticated)
 			{
+				Log("Authenticating...");
+
 				await _imapClient.AuthenticateAsync(Settings.Instance.Username, Settings.Instance.Password, cancellation);
 
 				await _imapClient.Inbox.OpenAsync(FolderAccess.ReadOnly, cancellation);
 			}
+			Log("Connected");
 		}
 
 		private DialogResult ShowConfigurationDialog()
@@ -199,12 +273,14 @@ namespace ImapNotifier
 
 		public void ShowConfiguration()
 		{
+			Log($"{(_cancellation == null ? "Unable to " : "")}Request Config UI");
 			if (_cancellation != null)
 			{
 				_notifyIcon.ShowIcon();
 				_showConfiguration = true;
 				_idleDone?.Cancel();
 				_cancellation?.Cancel();
+				_interruptExceptionBackOff?.Cancel();
 			}
 		}
 	}

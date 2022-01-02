@@ -18,6 +18,8 @@ namespace ImapNotifier
 		private readonly WindowsFormsSynchronizationContext _synchronizationContext;
 		private string? _errorMessage;
 
+		public event EventHandler<EventArgs>? ErrorDismissed;
+
 		public NotifyIcon()
 		{
 			_font = new Font(FontFamily.GenericSansSerif, SystemInformation.SmallIconSize.Height / 3);
@@ -139,17 +141,21 @@ namespace ImapNotifier
 
 		public void ShowError(string message)
 		{
-			_errorMessage = message;
-			Invoke(delegate
+			if (_errorMessage == null)
 			{
-				_notifyIcon.Text = Application.ProductName + " Error";
-				_notifyIcon.Visible = true;
-				_notifyIcon.ShowBalloonTip(0, "Error:", message, ToolTipIcon.Error);
-			});
+				Invoke(delegate
+				{
+					_notifyIcon.Text = Application.ProductName + " Error";
+					_notifyIcon.Visible = true;
+					_notifyIcon.ShowBalloonTip(0, $"Error ({DateTime.Now}):", message, ToolTipIcon.Error);
+				});
+			}
+			_errorMessage = message;
 		}
 
 		private void OnBallonTipClicked(object? sender, EventArgs e)
 		{
+			ErrorDismissed?.Invoke(this, e);
 			_errorMessage = null;
 			Invoke(UpdateVisibility);
 		}
@@ -158,7 +164,10 @@ namespace ImapNotifier
 		{
 			if (_errorMessage != null)
 			{
-				ShowError(_errorMessage);
+				// Force reshow error
+				var message = _errorMessage;
+				_errorMessage = null;
+				ShowError(message);
 			}
 			else if (!string.IsNullOrEmpty(Settings.Instance.OpenEmail))
 			{

@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -23,10 +24,16 @@ namespace ImapNotifier
                     Application.EnableVisualStyles();
                     Application.SetCompatibleTextRenderingDefault(false);
 
+#if LOG
+                    using var logWriter = new StreamWriter(File.Open("ImapNotifier.log", FileMode.Append | FileMode.OpenOrCreate, FileAccess.Write, FileShare.Read));
+#else
+                    var logWriter = StreamWriter.Null;
+#endif
+
                     using var notifyIcon = new NotifyIcon();
                     notifyIcon.ShowIcon();
 
-                    var imapMonitor = new ImapMonitor(notifyIcon);
+                    var imapMonitor = new ImapMonitor(notifyIcon, logWriter);
 
                     instanceManager.SecondInstanceStarted += delegate
                     {

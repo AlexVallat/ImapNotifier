@@ -1,27 +1,35 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <OutputType>WinExe</OutputType>
-    <TargetFramework>net5.0-windows</TargetFramework>
-    <UseWindowsForms>true</UseWindowsForms>
-	  <GenerateDependencyFile Condition="'$(Configuration)'!='DEBUG'">false</GenerateDependencyFile>
-	  <ApplicationIcon>Application.ico</ApplicationIcon>
+	<PropertyGroup>
+		<OutputType>WinExe</OutputType>
+		<TargetFramework>net6.0-windows</TargetFramework>
+		<UseWindowsForms>true</UseWindowsForms>
+		<GenerateDependencyFile Condition="'$(Configuration)'!='DEBUG'">false</GenerateDependencyFile>
+		<ApplicationIcon>Application.ico</ApplicationIcon>
 		<Nullable>Enable</Nullable>
 		<Version>1.1.0</Version>
-  </PropertyGroup>
+	</PropertyGroup>
 
-  <ItemGroup>
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+	  <DefineConstants>$(DefineConstants)TRACE;LOG</DefineConstants>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+	  <DefineConstants>$(DefineConstants)TRACE;LOG</DefineConstants>
+	</PropertyGroup>
+
+	<ItemGroup>
 		<None Remove=".gitignore" />
-    <None Remove=".gitmodules" />
-  </ItemGroup>
+		<None Remove=".gitmodules" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <EmbeddedResource Include="NotificationIcon\*.png" />
-  </ItemGroup>
+	<ItemGroup>
+		<EmbeddedResource Include="NotificationIcon\*.png" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <PackageReference Include="MailKit" Version="2.11.1" />
-    <PackageReference Include="phirSOFT.SingleInstanceManager" Version="0.2.0" />
+	<ItemGroup>
+		<PackageReference Include="MailKit" Version="2.11.1" />
+		<PackageReference Include="phirSOFT.SingleInstanceManager" Version="0.2.0" />
 	</ItemGroup>
 
 	<ItemGroup>
