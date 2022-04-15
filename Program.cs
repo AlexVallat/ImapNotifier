@@ -25,7 +25,7 @@ namespace ImapNotifier
                     Application.SetCompatibleTextRenderingDefault(false);
 
 #if LOG
-                    using var logWriter = new StreamWriter(File.Open("ImapNotifier.log", FileMode.Append | FileMode.OpenOrCreate, FileAccess.Write, FileShare.Read));
+                    using var logWriter = new StreamWriter(File.Open(Path.Combine(Path.GetDirectoryName(typeof(Program).Assembly.Location)!, "ImapNotifier.log"), FileMode.Append | FileMode.OpenOrCreate, FileAccess.Write, FileShare.Read));
 #else
                     var logWriter = StreamWriter.Null;
 #endif
