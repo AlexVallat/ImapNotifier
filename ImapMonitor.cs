@@ -203,7 +203,7 @@ namespace ImapNotifier
 				catch (Exception ex)
 				{
 					_notifyIcon.ShowError(ex.Message);
-					var delay = _backOffRetry[Math.Max(backOffRetryIndex++, _backOffRetry.Length - 1)];
+					var delay = _backOffRetry[Math.Min(backOffRetryIndex++, _backOffRetry.Length - 1)];
 					_interruptExceptionBackOff = new CancellationTokenSource();
 
 					Log($"Error: {ex.Message}, waiting {delay}");
